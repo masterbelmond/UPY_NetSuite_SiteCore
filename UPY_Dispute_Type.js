@@ -3,6 +3,8 @@
  * @ AUTHOR         : eli@upaya
  * @ DATE           : Mar 2018
  * @ DESCRIPTION    : Update the 'Dispute Type Date Modified' field whenever the 'Dispute Type' is updated.
+ * 1.00       16 Mar 2018     Eli@upaya         initial version
+ * 2.00       21 Mar 2018     Eli@upaya         modify the 'Dispute Type Date Modified' only on the first instance.
  *
  * Copyright (c) 2012 Upaya - The Solution Inc.
  * 10530 N. Portal Avenue, Cupertino CA 95014
@@ -58,18 +60,37 @@ function userEventAfterSubmit(type) {
 
             var tempDate = nlapiStringToDate(dateTime, 'datetimetz');
             var obj = nlapiLoadRecord(nlapiGetRecordType(), invoiceId);
+            var isDateMod = obj.getFieldValue('custbody_dispute_type_date_mod');
 
-            var disputeType = obj.getFieldValue('custbody_upy_dispute_type');
-            var tempCurrDateTime = obj.getFieldValue('custbody_dispute_type_date_mod');
+            if(isBlank(isDateMod)) {
+                var disputeType = obj.getFieldValue('custbody_upy_dispute_type');
+                var tempCurrDateTime = obj.getFieldValue('custbody_dispute_type_date_mod');
 
-            if(!isBlank(disputeType) && !isBlank(tempCurrDateTime)) {
+                if (!isBlank(disputeType) && !isBlank(tempCurrDateTime)) {
 
-                loggerJSON('DATE TIME DETAILS', 'System Date: ' + dateTime + ' | Current Date: ' + tempCurrDateTime);
+                    loggerJSON('DATE TIME DETAILS', 'System Date: ' + dateTime + ' | Current Date: ' + tempCurrDateTime);
 
-                if (nlapiStringToDate(dateTime) != nlapiStringToDate(tempCurrDateTime)) {
-                    loggerJSON('MODIFIED', 'MODIFIED');
-                    obj.setFieldValue('custbody_dispute_type_date_mod', nlapiDateToString(tempDate, 'datetimetz'));
+                    if (nlapiStringToDate(dateTime) != nlapiStringToDate(tempCurrDateTime)) {
+                        loggerJSON('MODIFIED', 'MODIFIED');
+                        obj.setFieldValue('custbody_dispute_type_date_mod', nlapiDateToString(tempDate, 'datetimetz'));
 
+                        try {
+
+                            var recordId = nlapiSubmitRecord(obj, {
+                                disabletriggers: true,
+                                enablesourcing: false,
+                                ignoremandatoryfields: true
+                            });
+                        } catch (ex) {
+
+                            nlapiLogExecution('ERROR', ex instanceof nlobjError ? ex.getCode() : 'CUSTOM_ERROR_CODE', ex instanceof nlobjError ? ex.getDetails() : 'JavaScript Error: ' + (ex.message !== null ? ex.message : ex));
+
+                        }
+                    }
+                }
+                else if (!isBlank(disputeType) && isBlank(tempCurrDateTime)) {
+                    var nowDate = new Date();
+                    obj.setFieldValue('custbody_dispute_type_date_mod', nlapiDateToString(nowDate, 'datetimetz'));
                     try {
 
                         var recordId = nlapiSubmitRecord(obj, {
@@ -82,22 +103,6 @@ function userEventAfterSubmit(type) {
                         nlapiLogExecution('ERROR', ex instanceof nlobjError ? ex.getCode() : 'CUSTOM_ERROR_CODE', ex instanceof nlobjError ? ex.getDetails() : 'JavaScript Error: ' + (ex.message !== null ? ex.message : ex));
 
                     }
-                }
-            }
-            else if(!isBlank(disputeType) && isBlank(tempCurrDateTime)){
-                var nowDate = new Date();
-                obj.setFieldValue('custbody_dispute_type_date_mod', nlapiDateToString(nowDate, 'datetimetz'));
-                try {
-
-                    var recordId = nlapiSubmitRecord(obj, {
-                        disabletriggers: true,
-                        enablesourcing: false,
-                        ignoremandatoryfields: true
-                    });
-                } catch (ex) {
-
-                    nlapiLogExecution('ERROR', ex instanceof nlobjError ? ex.getCode() : 'CUSTOM_ERROR_CODE', ex instanceof nlobjError ? ex.getDetails() : 'JavaScript Error: ' + (ex.message !== null ? ex.message : ex));
-
                 }
             }
 
